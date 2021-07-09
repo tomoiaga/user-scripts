@@ -9,7 +9,7 @@
 // @grant        none
 // ==/UserScript==
 (function() {
-    const config = {
+    const CONFIG = {
         /* the script will run only on URLs that contain this identifier, ex: http://jira.mycompany.com */
         URL_IDENTIFIER_FOR_JIRA: 'jira',
 
@@ -42,7 +42,7 @@
 
         for (let y = 0; y < array.length; y += 1) {
             const cell = newRow.appendChild(document.createElement('th'));
-            cell.innerText = (array[y] > 0) ? array[y] : config.NA;
+            cell.innerText = (array[y] > 0) ? array[y] : CONFIG.NA;
         }
 
         headerRow.parentElement.appendChild(newRow);
@@ -65,7 +65,7 @@
     }
 
     function sumNumericColumn() {
-        const gadgets = document.querySelectorAll(config.ISSUES_TABLES_SELECTOR.join());
+        const gadgets = document.querySelectorAll(CONFIG.ISSUES_TABLES_SELECTOR.join());
         let headerRow;
         for (let i = 0; i < gadgets.length; i += 1) {
             let gadget = gadgets[i];
@@ -94,7 +94,7 @@
 
     if (typeof window !== "undefined") {
         window.onload = function() {
-            const isJiraLocation = (new RegExp(config.URL_IDENTIFIER_FOR_JIRA)).test(location.href);
+            const isJiraLocation = (new RegExp(CONFIG.URL_IDENTIFIER_FOR_JIRA)).test(location.href);
             if (isJiraLocation) {
                 init(3);
             }
