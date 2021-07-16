@@ -5,7 +5,6 @@
 // @description  Adds a new Totals row in the header of any Jira issues table with the sum of numeric values in each column.
 // @author       Vasile Tomoiaga
 // @match        *://*/*
-// @icon         https://www.google.com/s2/favicons?domain=
 // @grant        none
 // ==/UserScript==
 (function() {
