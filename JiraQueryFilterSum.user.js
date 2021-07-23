@@ -17,7 +17,10 @@
         ISSUES_TABLES_SELECTOR: [
             'div.gadget',
             '.results-panel',
+            '.ghx-issuetable'
         ],
+
+        ENRICH_EPIC_PAGE: true,
 
         /* Text to display in header Sum row when the column has no numeric values */
         NA: 'n/a'
@@ -25,11 +28,9 @@
 
     function getIntegerArray(arrayLength) {
         const array = [];
-
         for (let i = 0; i < arrayLength; i += 1) {
             array[i] = 0;
         }
-
         return array;
     }
 
@@ -64,40 +65,120 @@
         }
     }
 
+    function addTableHead(table) {
+        if (table.querySelector('thead') == null) {
+            var tBody = table.querySelector('tbody');
+            if (tBody) {
+                var head = document.createElement('thead');
+                table.insertBefore(head, tBody);
+
+                var firstBodyRow = tBody.querySelector('tr');
+                if (firstBodyRow) {
+                    var countCols = firstBodyRow.querySelectorAll('td').length;
+                    var row = head.appendChild(document.createElement("tr"));
+                    row.classList.add('rowHeader');
+
+                    for (let i = 0; i < countCols; i += 1) {
+                        var th = document.createElement("th");
+                        th.innerText = '🔵';
+                        row.appendChild(th);
+                    }
+                }
+            }
+        }
+    }
+
+    function sumNumericColumnFor(gadget) {
+        addTableHead(gadget);
+        const headerRow = gadget.querySelector('thead tr');
+        let issueRows = gadget.querySelectorAll('tbody tr');
+        if (issueRows.length > 0) {
+            let sumArray = getIntegerArray(headerRow.querySelectorAll('th').length);
+
+            for (let j = 0; j < issueRows.length; j += 1) {
+                const cells = issueRows[j].children;
+                parseCellsForIntegers(cells, sumArray);
+            }
+
+            if (sumArray.filter((x) => x > 0).length > 0) {
+                appendSumRow(sumArray, headerRow);
+            }
+        }
+    }
+
+
     function sumNumericColumn() {
         const gadgets = document.querySelectorAll(CONFIG.ISSUES_TABLES_SELECTOR.join());
-        let headerRow;
         for (let i = 0; i < gadgets.length; i += 1) {
-            let gadget = gadgets[i];
-            headerRow = gadget.querySelector('thead tr');
-            if (headerRow == null) continue;
-
-            let issueRows = gadget.querySelectorAll('tbody tr');
-            if (issueRows.length > 0) {
-                let sumArray = getIntegerArray(headerRow.querySelectorAll('th').length);
-
-                for (let j = 0; j < issueRows.length; j += 1) {
-                    const cells = issueRows[j].children;
-                    parseCellsForIntegers(cells, sumArray);
-                }
-
-                if (sumArray.filter((x) => x > 0).length > 0) {
-                    appendSumRow(sumArray, headerRow);
-                }
-            }
+            sumNumericColumnFor(gadgets[i]);
         }
     }
 
-    function init(secondsDelay) {
-        setTimeout(sumNumericColumn, 1000 * secondsDelay);
+    /* START REGION ENRICH EPIC PAGE */
+
+    const detectEpicPage = () => {
+        var isEpic = document.querySelectorAll('.type-gh-epic-label').length > 0;
+        return isEpic;
     }
 
+    async function readJqlJSON(jql) {
+        const response = await fetch('/rest/api/latest/search?jql=' + jql);
+        const issue = await response.json();
+        return issue;
+    }
+
+    function enrichEpicPage() {
+        const epicKey = document.querySelector('.issue-link').getAttribute('data-issue-key');
+        readJqlJSON('"Epic Link"=' + epicKey).then(jsonResponse => {
+            if (jsonResponse && jsonResponse.issues && jsonResponse.issues.length > 0) {
+                for(var i=0; i<jsonResponse.issues.length; i += 1) {
+                    const issueJson = jsonResponse.issues[i];
+                    const story = {
+                                key: issueJson.key,
+                                effort: issueJson.fields.customfield_10006
+                            };
+
+                    var issueDom = document.querySelector('#ghx-issues-in-epic-table tr[data-issuekey="' + story.key + '"]');
+                    var effortTD = document.createElement('td');
+                    effortTD.classList.add('nav', 'effort');
+                    effortTD.innerText = story.effort;
+                    var tdActions = issueDom.querySelector('.issue_actions');
+                    issueDom.insertBefore(effortTD, tdActions);
+                }
+
+                sumNumericColumnFor(document.querySelector('#ghx-issues-in-epic-table'));
+            }
+        });
+    }
+
+    /* END REGION ENRICH EPIC PAGE */
+
+    function init() {
+        sumNumericColumn();
+
+        if (CONFIG.ENRICH_EPIC_PAGE && detectEpicPage()) {
+            enrichEpicPage();
+        }
+    }
+
+    const load = () => {
+        const isJiraLocation = (new RegExp(CONFIG.URL_IDENTIFIER_FOR_JIRA)).test(location.href);
+        if (isJiraLocation) {
+            setTimeout(init, 1000 * 2);
+        }
+    }
+
+    const log = (text) => {
+        if (typeof window !== "undefined") {
+            console.log(text);
+        }
+    }
+
+
+    log('load event: adding');
     if (typeof window !== "undefined") {
-        window.onload = function() {
-            const isJiraLocation = (new RegExp(CONFIG.URL_IDENTIFIER_FOR_JIRA)).test(location.href);
-            if (isJiraLocation) {
-                init(3);
-            }
-        }
+        window.addEventListener('load', load);
+        log('load event: added');
+        //window.onload1 = load;
     }
 }());
