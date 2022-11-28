@@ -88,10 +88,11 @@ function computeDataSummary() {
 
 function initCanvas() {
     var _canvas = document.getElementById("myCanvas");
-    _canvas.width = 1000;
-    _canvas.height = 80;
+    _canvas.width = 1024;
+    _canvas.height = 55;
 
     var _context = _canvas.getContext("2d");
+    //_context.fillStyle = "#d3d3d3";
     _context.clearRect(0, 0, _canvas.width, _canvas.height);
 
     return _canvas;
@@ -102,7 +103,7 @@ function showChart() {
     log('➡ showChart');
 
     if ($('#barchart-container').length == 0) {
-        var _chart = $( "div.issue-search-header" ).after('<div id="barchart-container" style="padding: 10px 10px"><h2>Progress Chart <span id="refreshChart" style="cursor:pointer">⟳</span></h2><canvas id="myCanvas" style="border:1px solid #d3d3d3; margin-top:10px;"></div>');
+        var _chart = $( "div.issue-search-header" ).after('<div id="barchart-container" style="padding: 10px 5px"><h2>Progress Chart <span id="refreshChart" style="cursor:pointer" title="Reload">⟳</span></h2><canvas id="myCanvas" style="border:1px solid #d3d3d3; margin-top:5px;"></div>');
         $('#refreshChart').click(function() {
             computeDataSummary();
             showChart();
@@ -130,7 +131,7 @@ function showChart() {
             _context.fillRect(_horizontalStart, CHART_TOP_MARGIN, _width, _chartPanelHeight);
 
             _context.fillStyle = "black";
-            _context.font = "bold 13px Calibri";
+            _context.font = "bold 14px Calibri";
             _context.textAlign = "left";
             _context.fillText(category.Name, _horizontalStart + 5, CHART_TOP_MARGIN + _chartPanelHeight/4);
 
