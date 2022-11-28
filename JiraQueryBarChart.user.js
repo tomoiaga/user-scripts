@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Jira Query Bar Chart
+// @name         JiraQueryBarChart
 // @namespace    http://tomoiaga.ro
-// @version      0.1
+// @version      2022.11
 // @description  Jira Query Bar Chart
 // @author       Vasile Tomoiaga
 // @match        *://*/*
@@ -17,38 +17,60 @@ let currentUrl = document.location.href;
 const CONFIG = {
     URL_IDENTIFIER_FOR_JIRA: 'jira',
 
-    STATUS_COLUMN : 'customfield_10006',
+    EFFORT_COLUMN : 'customfield_10006',  /* The script will detect the Story Points column, and if not found, will use this value. */
 
     EFFORT_CATEGORIES: [
         {
             Name: "New",
             Statuses: ["New", "Refined"],
             Total: 0,
-            Color: '#FFE4B5'
+            Color: '#FEC009' /*'#FFE4B5'*/
         },
         {
             Name: "In Progress",
             Statuses: ["In Progress", "Commited", "Define", "Build", "In Review", "Testing"],
             Total: 0,
-            Color: "#1E90FF"
+            Color: "#43BCD9", /*"#00BFFF"*/
         },
         {
             Name: "Done",
             Statuses: ["Done", "Released", "Closed", "Resolved"],
             Total: 0,
-            Color: "#228B22"
+            Color: "#819E87" /*"#8FBC8F"*/
         }
     ]
 };
 
 this.$ = this.jQuery = jQuery.noConflict(true);
 
+function detectEffortColumnIndex(resultsTable) {
+    var _headerCells = resultsTable.getElementsByTagName("th");
+
+    for (let i = 0; i < _headerCells.length; i++) {
+        let _th = _headerCells[i];
+        let _x = _th.innerText;
+        let _cellText = _th.innerText.trim().toUpperCase();
+
+        if ((_cellText.includes("STORY") && _cellText.includes("POINTS")) ||
+           (_cellText.includes("EFFORT") && _cellText.includes("POINTS")))
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 function computeDataSummary() {
     log('➡ computeDataSummary');
 
+    CONFIG.EFFORT_CATEGORIES.forEach(category => { category.Total = 0 });
+
+    var _effortColumn = detectEffortColumnIndex($('#issuetable')[0]);
+
     $('#issuetable tr').each(function() {
         var _row = $(this);
-        var _storyPointsText = _row.find('.' + CONFIG.STATUS_COLUMN).text();
+        var _storyPointsText = _row.find('.' + CONFIG.EFFORT_COLUMN).text();
         const _storyPoints = parseInt(_storyPointsText, 10);
         if (isInteger(_storyPoints)){
             var _status = _row.find('td.status').text().trim();
@@ -60,48 +82,65 @@ function computeDataSummary() {
             if (_category) {
                 _category.Total = _category.Total + _storyPoints;
             }
-
-            console.log(_status + ' ' + _storyPoints + ' ' + _category);
         }
     });
 }
+
+function initCanvas() {
+    var _canvas = document.getElementById("myCanvas");
+    _canvas.width = 1000;
+    _canvas.height = 80;
+
+    var _context = _canvas.getContext("2d");
+    _context.clearRect(0, 0, _canvas.width, _canvas.height);
+
+    return _canvas;
+}
+
 
 function showChart() {
     log('➡ showChart');
 
     if ($('#barchart-container').length == 0) {
-        var _chart = $( "div.issue-search-header" ).after('<div id="barchart-container"><h2>Progress Chart</h2><canvas id="myCanvas" width="1050" height="100" style="border:1px solid #d3d3d3;"></div>');
-        $('#barchart-container').css('padding', '20');
+        var _chart = $( "div.issue-search-header" ).after('<div id="barchart-container" style="padding: 10px 10px"><h2>Progress Chart <span id="refreshChart" style="cursor:pointer">⟳</span></h2><canvas id="myCanvas" style="border:1px solid #d3d3d3; margin-top:10px;"></div>');
+        $('#refreshChart').click(function() {
+            computeDataSummary();
+            showChart();
+        });
     }
 
     var _totalEffort = CONFIG.EFFORT_CATEGORIES.reduce((partialSum, c) => partialSum + c.Total, 0);
 
-    var c = document.getElementById("myCanvas");
-    var ctx = c.getContext("2d");
+    var _canvas = initCanvas();
+    var _context = _canvas.getContext("2d");
 
-    ctx.clearRect(0, 0, c.width, c.height);
+    const CHART_TOP_MARGIN = 2;
+    const CHART_LEFT_MARGIN = 2;
 
-    const CHART_WIDTH = 1000;
-    const _top = 20;
-    const _height = 60;
-    var _x = 20;
+    const CHART_WIDTH = _canvas.width - CHART_LEFT_MARGIN - CHART_LEFT_MARGIN;
+
+    const _chartPanelHeight = _canvas.height - CHART_TOP_MARGIN - CHART_TOP_MARGIN;
+    
+    var _horizontalStart = CHART_LEFT_MARGIN;
 
     CONFIG.EFFORT_CATEGORIES.forEach(category => {
         let _width = (category.Total / _totalEffort) * CHART_WIDTH;
-        ctx.fillStyle = category.Color;
-        ctx.fillRect(_x, _top, _width, _height);
+        if (_width > 0) { /* do not draw areas with 0 width */
+            _context.fillStyle = category.Color;
+            _context.fillRect(_horizontalStart, CHART_TOP_MARGIN, _width, _chartPanelHeight);
 
-        ctx.fillStyle = "black";
-        ctx.font = "bold 12px Calibri";
-        ctx.textAlign = "left";
-        ctx.fillText(category.Name, _x + 5, _top + _height/4);
+            _context.fillStyle = "black";
+            _context.font = "bold 13px Calibri";
+            _context.textAlign = "left";
+            _context.fillText(category.Name, _horizontalStart + 5, CHART_TOP_MARGIN + _chartPanelHeight/4);
 
-        ctx.font = "normal 12px Calibri";
-        ctx.fillText('' + Math.round((category.Total / _totalEffort) * 100) + '%', _x + 5, _top + _height/2);
+            _context.font = "normal 13px Calibri";
+            _context.fillText('' + Math.round((category.Total / _totalEffort) * 100) + '%', _horizontalStart + 5, CHART_TOP_MARGIN + _chartPanelHeight/2);
 
-        ctx.fillText('' + category.Total + ' sp', _x + 5, _top + _height - 5);
+            _context.fillText('' + category.Total + ' sp (' + _totalEffort + ')', _horizontalStart + 5, CHART_TOP_MARGIN + _chartPanelHeight - 5);
 
-        _x += _width;
+            _horizontalStart += _width;
+        }
     });
 }
 
